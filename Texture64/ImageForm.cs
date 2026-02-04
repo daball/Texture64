@@ -46,6 +46,9 @@ namespace Texture64
       // graphics viewer that was mouse down event occurred to detect mouse click
       private GraphicsViewer clickedGV = null;
 
+      // store the mouse position for palette editing
+      private Point lastMousePosition;
+
       public ImageForm()
       {
          InitializeComponent();
@@ -726,6 +729,7 @@ namespace Texture64
       private void graphicsViewer_MouseDown(object sender, MouseEventArgs e)
       {
          clickedGV = (GraphicsViewer)sender;
+         lastMousePosition = e.Location;
       }
 
       private void graphicsViewer_MouseUp(object sender, MouseEventArgs e)
@@ -988,5 +992,74 @@ namespace Texture64
          setPaletteOffset(offset + paletteBytes);
          checkExtPalette.Checked = false;
       }
-   }
+
+      private void gvEditPaletteColor_Click(object sender, EventArgs e)
+      {
+         if (rightClickGV == gviewPalette && curPalette != null)
+         {
+            GraphicsViewer gv = gviewPalette;
+            int pixOffset = (lastMousePosition.Y / gv.PixScale) * gv.GetPixelWidth() + lastMousePosition.X / gv.PixScale;
+            int byteOffset = N64Graphics.PixelsToBytes(gv.Codec, pixOffset);
+
+            if (byteOffset >= 0 && byteOffset + 1 < curPalette.Length)
+            {
+               // Get current color
+               Color currentColor = N64Graphics.RGBA16Color(curPalette, byteOffset);
+
+               // Show color picker
+               colorDialogPalette.Color = currentColor;
+               colorDialogPalette.AllowFullOpen = true;
+               colorDialogPalette.FullOpen = true;
+
+               if (colorDialogPalette.ShowDialog() == DialogResult.OK)
+               {
+                  // Convert selected color back to RGBA16
+                  N64Graphics.ColorToRGBA16(colorDialogPalette.Color, out byte c0, out byte c1);
+
+                  // Determine where to save the palette data
+                  byte[] targetPalette;
+                  int targetOffset = (int)numericPalette.Value + byteOffset;
+
+                  if (separatePalette && extPaletteData != null)
+                  {
+                     targetPalette = extPaletteData;
+                     extPaletteChanged = true;
+                  }
+                  else
+                  {
+                     targetPalette = romData;
+                     fileDataChanged = true;
+                  }
+
+                  // Update the palette data
+                  if (targetOffset + 1 < targetPalette.Length)
+                  {
+                     targetPalette[targetOffset] = c0;
+                     targetPalette[targetOffset + 1] = c1;
+
+                     // Update curPalette as well
+                     curPalette[byteOffset] = c0;
+                     curPalette[byteOffset + 1] = c1;
+
+                     // Mark as needing save and refresh viewers
+                     toolStripSave.Enabled = true;
+                     UpdatePalette();
+                     foreach (GraphicsViewer viewer in viewers)
+                     {
+                        viewer.Invalidate();
+                     }
+                     gviewPalette.Invalidate();
+                  }
+               }
+            }
+         }
+      }
+
+      private void gvContextMenuStrip_Opening(object sender, System.ComponentModel.CancelEventArgs e)
+      {
+         // Only show "Edit Palette Color" when right-clicking on the palette viewer
+         gvEditPaletteColor.Visible = (rightClickGV == gviewPalette);
+      }
+
+    }
 }

@@ -49,6 +49,15 @@ namespace Texture64
          return RGBA16Color(c0, c1);
       }
 
+      public static void ColorToRGBA16(Color color, out byte c0, out byte c1)
+      {
+         byte r = SCALE_8_5(color.R);
+         byte g = SCALE_8_5(color.G);
+         byte b = SCALE_8_5(color.B);
+         c0 = (byte)((r << 3) | (g >> 2));
+         c1 = (byte)(((g & 0x3) << 6) | (b << 1) | ((color.A > 0) ? 1 : 0));
+      }
+
       public static Color RGBA32Color(byte[] data, int pixOffset)
       {
          int r, g, b, a;
